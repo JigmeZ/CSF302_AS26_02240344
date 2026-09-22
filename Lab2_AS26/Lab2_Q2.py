@@ -1,7 +1,7 @@
 """
 Q2: Merge Sort Analysis (Menu-Driven Program)
 Sorts an array using Merge Sort, counts comparisons (step/frequency count),
-and analyzes time complexity for random, sorted, and descending-sorted data.
+and analyzes time complexity for random, sorted, and descending-sorted data..
 """
 
 import random
