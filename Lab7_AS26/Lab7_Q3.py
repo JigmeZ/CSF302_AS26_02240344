@@ -1,9 +1,8 @@
 """
-Lab 7 - Question 3: Dijkstra, Kruskal, and Prim.
+Lab 7 - Question 3
+Dijkstra, Kruskal, and Prim algorithms.
 
-Graph file format: first line ``V E`` followed by E lines ``u v weight``.
-Vertices are numbered 0 through V-1.  Dijkstra treats edges as directed;
-the MST functions treat their input edges as undirected.
+An edge is written as (weight, first_vertex, second_vertex).
 """
 
 import heapq
@@ -11,138 +10,180 @@ import random
 import time
 
 
-def dijkstra(graph, source):
+def dijkstra(graph, start):
+    """Find shortest distances from start in a graph with non-negative edges."""
     distance = {vertex: float("inf") for vertex in graph}
     previous = {vertex: None for vertex in graph}
-    distance[source] = 0
-    heap = [(0, source)]
+    distance[start] = 0
+    heap = [(0, start)]
+    visited = set()
+
     while heap:
         current_distance, vertex = heapq.heappop(heap)
-        if current_distance != distance[vertex]:
+        if vertex in visited:
             continue
+        visited.add(vertex)
+
         for neighbour, weight in graph[vertex]:
+            if neighbour in visited:
+                continue
             new_distance = current_distance + weight
             if new_distance < distance[neighbour]:
                 distance[neighbour] = new_distance
                 previous[neighbour] = vertex
                 heapq.heappush(heap, (new_distance, neighbour))
+
     return distance, previous
 
 
-def path_to(previous, source, target):
+def make_path(previous, start, end):
+    """Create the path from start to end using the previous-vertex table."""
     path = []
-    while target is not None:
-        path.append(target)
-        if target == source:
+    while end is not None:
+        path.append(end)
+        if end == start:
             return path[::-1]
-        target = previous[target]
-    return []
+        end = previous[end]
+    return []  # The vertex cannot be reached.
 
 
 class UnionFind:
-    def __init__(self, size):
-        self.parent = list(range(size))
-        self.rank = [0] * size
+    """A simple structure used by Kruskal to detect cycles."""
 
-    def find(self, value):
-        while value != self.parent[value]:
-            self.parent[value] = self.parent[self.parent[value]]
-            value = self.parent[value]
-        return value
+    def __init__(self, number_of_vertices):
+        self.parent = list(range(number_of_vertices))
 
-    def union(self, first, second):
-        first, second = self.find(first), self.find(second)
+    def find(self, vertex):
+        while vertex != self.parent[vertex]:
+            vertex = self.parent[vertex]
+        return vertex
+
+    def join(self, first, second):
+        first = self.find(first)
+        second = self.find(second)
         if first == second:
             return False
-        if self.rank[first] < self.rank[second]:
-            first, second = second, first
         self.parent[second] = first
-        if self.rank[first] == self.rank[second]:
-            self.rank[first] += 1
         return True
 
 
-def kruskal(vertices, edges):
-    chosen = []
-    sets = UnionFind(vertices)
+def kruskal(number_of_vertices, edges):
+    """Return the edges and total weight of a minimum spanning tree."""
+    sets = UnionFind(number_of_vertices)
+    tree = []
+
     for weight, first, second in sorted(edges):
-        if sets.union(first, second):
-            chosen.append((first, second, weight))
-    return chosen, sum(edge[2] for edge in chosen)
+        if sets.join(first, second):
+            tree.append((first, second, weight))
+
+    total = sum(weight for _, _, weight in tree)
+    return tree, total
 
 
-def prim(vertices, edges):
-    graph = [[] for _ in range(vertices)]
+def prim(number_of_vertices, edges):
+    """Return the edges and total weight of a minimum spanning tree."""
+    graph = [[] for _ in range(number_of_vertices)]
     for weight, first, second in edges:
         graph[first].append((weight, second))
         graph[second].append((weight, first))
-    chosen = []
+
+    tree = []
     visited = {0}
     heap = [(weight, 0, neighbour) for weight, neighbour in graph[0]]
     heapq.heapify(heap)
-    while heap and len(visited) < vertices:
+
+    while heap and len(visited) < number_of_vertices:
         weight, first, second = heapq.heappop(heap)
         if second in visited:
             continue
+
         visited.add(second)
-        chosen.append((first, second, weight))
+        tree.append((first, second, weight))
+
         for next_weight, neighbour in graph[second]:
             if neighbour not in visited:
                 heapq.heappush(heap, (next_weight, second, neighbour))
-    return chosen, sum(edge[2] for edge in chosen)
+
+    total = sum(weight for _, _, weight in tree)
+    return tree, total
 
 
-def random_connected_graph(vertices, extra_edges):
+def random_graph(number_of_vertices, extra_edges):
+    """Make a connected random undirected graph."""
     edges = []
-    used = set()
-    for vertex in range(1, vertices):
+    used_edges = set()
+
+    # First connect every vertex, so the graph is definitely connected.
+    for vertex in range(1, number_of_vertices):
         parent = random.randrange(vertex)
-        weight = random.randint(1, 100)
-        edges.append((weight, parent, vertex))
-        used.add(tuple(sorted((parent, vertex))))
-    while len(edges) < vertices - 1 + extra_edges:
-        first, second = random.sample(range(vertices), 2)
-        pair = tuple(sorted((first, second)))
-        if pair not in used:
-            used.add(pair)
+        edges.append((random.randint(1, 100), parent, vertex))
+        used_edges.add(tuple(sorted((parent, vertex))))
+
+    # Add more edges.
+    wanted_edges = number_of_vertices - 1 + extra_edges
+    while len(edges) < wanted_edges:
+        first, second = random.sample(range(number_of_vertices), 2)
+        edge = tuple(sorted((first, second)))
+        if edge not in used_edges:
+            used_edges.add(edge)
             edges.append((random.randint(1, 100), first, second))
+
     return edges
 
 
 def main():
-    graph = {0: [(1, 4), (2, 1)], 1: [(3, 1)], 2: [(1, 2), (3, 5)],
-             3: []}
-    distances, previous = dijkstra(graph, 0)
+    # ---------------- Dijkstra ----------------
+    graph = {
+        0: [(1, 4), (2, 1)],
+        1: [(3, 1)],
+        2: [(1, 2), (3, 5)],
+        3: [],
+    }
+
+    distance, previous = dijkstra(graph, 0)
     print("Dijkstra from vertex 0:")
     for vertex in graph:
-        print(vertex, "distance =", distances[vertex],
-              "path =", path_to(previous, 0, vertex))
+        print(vertex, "distance =", distance[vertex],
+              "path =", make_path(previous, 0, vertex))
 
-    edges = [(4, 0, 1), (1, 0, 2), (2, 1, 2), (5, 1, 3), (8, 2, 3)]
-    print("\nKruskal MST weight:", kruskal(4, edges)[1])
-    print("Prim MST weight:   ", prim(4, edges)[1])
+    # ---------------- MST algorithms ----------------
+    edges = [(4, 0, 1), (1, 0, 2), (2, 1, 2),
+             (5, 1, 3), (8, 2, 3)]
+
+    print("\nKruskal total weight:", kruskal(4, edges)[1])
+    print("Prim total weight:   ", prim(4, edges)[1])
 
     for _ in range(100):
-        test_edges = random_connected_graph(20, 30)
+        test_edges = random_graph(20, 30)
         assert kruskal(20, test_edges)[1] == prim(20, test_edges)[1]
-    print("Random MST verification: 100/100 tests passed")
+    print("Random MST test: 100/100 passed")
 
-    negative_graph = {0: [(1, 2), (2, 5)], 1: [(2, -10)], 2: []}
-    print("\nNegative-edge warning:")
-    print("Dijkstra gives", dijkstra(negative_graph, 0)[0][2],
-          "for 0 -> 2, but the correct answer is -8.")
+    # Dijkstra is not suitable for negative edges.
+    bad_graph = {
+        0: [(1, 10), (2, 1)],
+        1: [(2, -20)],
+        2: [],
+    }
+    wrong_distance = dijkstra(bad_graph, 0)[0][2]
+    print("\nNegative-edge example:")
+    print("Dijkstra returns", wrong_distance,
+          "but the correct distance is -10.")
 
-    for extra in (2 * 1000, 250000 - 1000 + 1):
-        edges = random_connected_graph(1000, extra)
+    # Timing: sparse graph has about 3V edges; dense graph has about V^2/4.
+    for name, extra_edges in [("sparse", 2 * 1000),
+                              ("dense", 250000 - 1000 + 1)]:
+        test_edges = random_graph(1000, extra_edges)
+
         start = time.perf_counter()
-        kruskal(1000, edges)
+        kruskal(1000, test_edges)
         kruskal_time = time.perf_counter() - start
+
         start = time.perf_counter()
-        prim(1000, edges)
+        prim(1000, test_edges)
         prim_time = time.perf_counter() - start
-        label = "sparse" if extra == 2000 else "dense"
-        print(label, "graph: Kruskal =", round(kruskal_time, 3),
-              "s, Prim =", round(prim_time, 3), "s")
+
+        print(name, "graph: Kruskal =", round(kruskal_time, 3),
+              "seconds, Prim =", round(prim_time, 3), "seconds")
 
 
 if __name__ == "__main__":
